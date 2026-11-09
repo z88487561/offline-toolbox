@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>圖片合成工具</title>
+
+    
+
+    <style>
+/*!
+ * Cropper.js v1.5.13
+ * https://fengyuanchen.github.io/cropperjs
+ *
+ * Copyright 2015-present Chen Fengyuan
+ * Released under the MIT license
+ *
+ * Date: 2022-11-20T05:30:43.444Z
+ */.cropper-container{direction:ltr;font-size:0;line-height:0;position:relative;-ms-touch-action:none;touch-action:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.cropper-container img{-webkit-backface-visibility:hidden;backface-visibility:hidden;display:block;height:100%;image-orientation:0deg;max-height:none!important;max-width:none!important;min-height:0!important;min-width:0!important;width:100%}.cropper-canvas,.cropper-crop-box,.cropper-drag-box,.cropper-modal,.cropper-wrap-box{bottom:0;left:0;position:absolute;right:0;top:0}.cropper-canvas,.cropper-wrap-box{overflow:hidden}.cropper-drag-box{background-color:#fff;opacity:0}.cropper-modal{background-color:#000;opacity:.5}.cropper-view-box{display:block;height:100%;outline:1px solid #39f;outline-color:rgba(51,153,255,.75);overflow:hidden;width:100%}.cropper-dashed{border:0 dashed #eee;display:block;opacity:.5;position:absolute}.cropper-dashed.dashed-h{border-bottom-width:1px;border-top-width:1px;height:33.33333%;left:0;top:33.33333%;width:100%}.cropper-dashed.dashed-v{border-left-width:1px;border-right-width:1px;height:100%;left:33.33333%;top:0;width:33.33333%}.cropper-center{display:block;height:0;left:50%;opacity:.75;position:absolute;top:50%;width:0}.cropper-center:after,.cropper-center:before{background-color:#eee;content:" ";display:block;position:absolute}.cropper-center:before{height:1px;left:-3px;top:0;width:7px}.cropper-center:after{height:7px;left:0;top:-3px;width:1px}.cropper-face,.cropper-line,.cropper-point{display:block;height:100%;opacity:.1;position:absolute;width:100%}.cropper-face{background-color:#fff;left:0;top:0}.cropper-line{background-color:#39f}.cropper-line.line-e{cursor:ew-resize;right:-3px;top:0;width:5px}.cropper-line.line-n{cursor:ns-resize;height:5px;left:0;top:-3px}.cropper-line.line-w{cursor:ew-resize;left:-3px;top:0;width:5px}.cropper-line.line-s{bottom:-3px;cursor:ns-resize;height:5px;left:0}.cropper-point{background-color:#39f;height:5px;opacity:.75;width:5px}.cropper-point.point-e{cursor:ew-resize;margin-top:-3px;right:-3px;top:50%}.cropper-point.point-n{cursor:ns-resize;left:50%;margin-left:-3px;top:-3px}.cropper-point.point-w{cursor:ew-resize;left:-3px;margin-top:-3px;top:50%}.cropper-point.point-s{bottom:-3px;cursor:s-resize;left:50%;margin-left:-3px}.cropper-point.point-ne{cursor:nesw-resize;right:-3px;top:-3px}.cropper-point.point-nw{cursor:nwse-resize;left:-3px;top:-3px}.cropper-point.point-sw{bottom:-3px;cursor:nesw-resize;left:-3px}.cropper-point.point-se{bottom:-3px;cursor:nwse-resize;height:20px;opacity:1;right:-3px;width:20px}@media (min-width:768px){.cropper-point.point-se{height:15px;width:15px}}@media (min-width:992px){.cropper-point.point-se{height:10px;width:10px}}@media (min-width:1200px){.cropper-point.point-se{height:5px;opacity:.75;width:5px}}.cropper-point.point-se:before{background-color:#39f;bottom:-50%;content:" ";display:block;height:200%;opacity:0;position:absolute;right:-50%;width:200%}.cropper-invisible{opacity:0}.cropper-bg{background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQAQMAAAAlPW0iAAAAA3NCSVQICAjb4U/gAAAABlBMVEXMzMz////TjRV2AAAACXBIWXMAAArrAAAK6wGCiw1aAAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAABFJREFUCJlj+M/AgBVhF/0PAH6/D/HkDxOGAAAAAElFTkSuQmCC")}.cropper-hide{display:block;height:0;position:absolute;width:0}.cropper-hidden{display:none!important}.cropper-move{cursor:move}.cropper-crop{cursor:crosshair}.cropper-disabled .cropper-drag-box,.cropper-disabled .cropper-face,.cropper-disabled .cropper-line,.cropper-disabled .cropper-point{cursor:not-allowed}
+</style>
+
+    <script src="../lib/cropper.js"></script>
+
+    <script src="../lib/fabric.js"></script>
+
+
+
+    <style>
+
+        :root { --primary: #4361ee; --success: #2ec4b6; --danger: #e63946; --bg: #f0f2f5; }
+
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+
+        .main-ui { display: flex; flex-direction: column; gap: 15px; width: 100%; max-width: 1200px; }
+
+
+
+        @media (min-aspect-ratio: 1/1) or (min-width: 900px) {
+
+            .main-ui { flex-direction: row; align-items: flex-start; }
+
+            .box { flex: 1; }
+
+            .stage { min-height: 450px; max-height: 75vh; }
+
+        }
+
+
+
+        .box { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); display: flex; flex-direction: column; }
+
+        h4 { margin: 0 0 10px 0; font-size: 1rem; color: #333; }
+
+        
+
+        /* 畫布與裁切區域 */
+
+        .stage { 
+
+            width: 100%; background-color: #333; 
+
+            background-image: radial-gradient(#444 1px, transparent 1px);
+
+            background-size: 20px 20px;
+
+            display: flex; align-items: center; justify-content: center; 
+
+            overflow: hidden; border-radius: 8px; touch-action: none;
+
+        }
+
+        #img-a { max-width: 100%; display: block; }
+
+
+
+        .btn-group { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px; }
+
+        button { padding: 12px 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+
+        .btn-main { background: var(--primary); color: white; grid-column: span 2; }
+
+        .btn-action { background: #f0f0f0; color: #333; }
+
+        .btn-success { background: var(--success); color: white; }
+
+        .btn-danger { background: #fff1f1; color: var(--danger); }
+
+        button:active { transform: scale(0.98); opacity: 0.9; }
+
+        button:disabled { opacity: 0.4; pointer-events: none; }
+
+        
+
+        .setting-row { margin-top: 15px; padding: 12px; background: #f9f9f9; border-radius: 8px; font-size: 13px; }
+
+        .quality-slider { width: 100%; margin-top: 8px; }
+
+        .label { font-size: 11px; color: #999; margin-top: 10px; }
+
+        
+
+        /* 調整 Cropper 樣式使其在深色背景更明顯 */
+
+        .cropper-view-box { outline: 2px solid var(--primary); outline-color: rgba(67, 97, 238, 0.75); }
+
+        .cropper-line, .cropper-point { background-color: var(--primary); }
+
+    </style>
+
+
+<style>
+    /* 統一現代化分頁區塊高對比風格 CSS 覆寫 */
+    body, html { background-color: #f1f5f9 !important; color: #1e293b !important; font-family: 'Segoe UI', system-ui, sans-serif !important; }
+    
+    /* 側邊欄與主要工作區的底色分離 */
+    .sidebar, .control-panel, .header { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+    .main-view, .workspace, .editor-area, #main-view { background: #f1f5f9 !important; }
+    
+    /* 區塊化設計 (Modular Cards) */
+    .tool-group, .card, .container, .box, .modal { 
+        background: #ffffff !important; 
+        border-radius: 16px !important; 
+        border: 1px solid #e2e8f0 !important; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03) !important; 
+        padding: 24px !important; 
+        margin-bottom: 24px !important; 
+        color: #1e293b !important;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tool-group:hover, .card:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04) !important; }
+    
+    h1, h2, h3, h4, h5, h6 { color: #0f172a !important; text-shadow: none !important; font-weight: 700 !important; }
+    h3 { border-bottom: 2px solid #f1f5f9 !important; padding-bottom: 12px !important; margin-bottom: 20px !important; border-left: none !important; }
+    label { color: #475569 !important; font-weight: 600 !important; margin-bottom: 8px !important; display: block; }
+    
+    /* 全局通用按鈕 (顯眼化) */
+    button, .custom-file-upload { 
+        background: #ffffff !important; color: #334155 !important; border: 1px solid #cbd5e1 !important; 
+        border-radius: 8px !important; padding: 10px 16px !important; font-size: 14px !important; font-weight: 600 !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; cursor: pointer;
+    }
+    button:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08) !important; }
+    button:active { transform: translateY(0px) !important; }
+    select, input { background: #ffffff !important; color: #1e293b !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; padding: 10px 16px !important; transition: 0.2s !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important; }
+    select:focus, input:focus { border-color: #3b82f6 !important; outline: none !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.3) !important; }
+    
+    /* 核心主打按鈕 (極致顯眼) */
+    button[style*="success"], button[style*="purple"], button[style*="orange"], button[style*="dark-green"], button[id*="startBtn"], button[id*="recordBtn"], button.btn-generate, button[onclick*="imagesToPdf"], button[onclick*="batch"], button[onclick*="processAction"], .btn-primary, .btn-success, .btn-grey { 
+        background: #2563eb !important; color: white !important; border: none !important; 
+        box-shadow: 0 4px 10px rgba(37,99,235,0.3) !important; 
+    }
+    button[style*="success"]:hover, button[style*="purple"]:hover, button[style*="orange"]:hover, button[style*="dark-green"]:hover, button[id*="startBtn"]:hover, button.btn-generate:hover, button[onclick*="batch"]:hover, button[onclick*="processAction"]:hover, .btn-primary:hover, .btn-success:hover, .btn-grey:hover { 
+        background: #1d4ed8 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(37,99,235,0.4) !important; 
+    }
+    button[style*="danger"], button.accent, button.active-mode, .btn-danger { background: #ef4444 !important; color: white !important; border: none !important; box-shadow: 0 4px 10px rgba(239,68,68,0.3) !important; }
+    button[style*="danger"]:hover, button.accent:hover, .btn-danger:hover { background: #dc2626 !important; transform: translateY(-2px) !important; }
+    
+    /* 畫布與影片 (Canvas & Video) */
+    canvas { background: #ffffff !important; border: 1px dashed #cbd5e1 !important; border-radius: 12px !important; }
+    canvas.upper-canvas { background: transparent !important; border: none !important; }
+    #preview, video { border-radius: 12px !important; box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important; background: #000 !important; }
+    .video-container { background: #000 !important; border-radius: 12px; overflow: hidden; }
+    
+    /* 其他輔助線條 */
+    .thumb-bar { background: #ffffff !important; border-top: 1px solid #e2e8f0 !important; }
+    .thumb-item { border: 2px solid transparent !important; border-radius: 8px !important; opacity: 0.6; transition: 0.2s; }
+    .thumb-item.active { border-color: #2563eb !important; opacity: 1; box-shadow: 0 0 8px rgba(37,99,235,0.4); }
+    .thumb-item:hover { opacity: 0.9; }
+    .divider, hr { border-color: #e2e8f0 !important; border-bottom: 0 !important; margin: 20px 0 !important; }
+    .info, .tool-label, span { color: #64748b !important; text-shadow: none !important; }
+    input[type="range"] { accent-color: #2563eb; }
+    
+    /* PDF Viewer specific overrides */
+    #pdfPreview { background-color: #f1f5f9 !important; }
+    .pdf-page-container { background: white !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; overflow: hidden; }
+    
+    /* Hide some outdated UI borders */
+    .btn-row, .tool-group { border-color: #e2e8f0 !important; }
+    .status-box { color: #475569 !important; }
+
+    /* 圖片合成工具的合成畫布：強制圖片與畫布四個角為直角，不顯示為圓角 */
+    #canvas-container,
+    #canvas-container .canvas-container,
+    #canvas-container canvas,
+    #canvas-container .lower-canvas,
+    #canvas-container .upper-canvas,
+    canvas#main-canvas {
+        border-radius: 0 !important;
+    }
+</style>
+</head>
+
+<body>
+
+
+
+    <div class="main-ui">
+
+        <div class="box">
+
+            <h4>1. 裁切來源</h4>
+
+            <input type="file" id="upload-a" accept="image/*,.heic,.heif,.HEIC,.HEIF,.avif,.webp,.png,.jpg,.jpeg,.jfif,.bmp,.gif,.tiff,.tif">
+
+            <div class="stage"><img id="img-a"></div>
+
+            <div class="btn-group">
+
+                <button class="btn-main" id="btn-crop" disabled>✂️ 裁切並置入畫布</button>
+
+            </div>
+
+            <div class="label">操作提示：直接在圖片上拖曳可「重新劃定」裁切框。</div>
+
+        </div>
+
+
+
+        <div class="box">
+
+            <h4>2. 合成畫布</h4>
+
+            <input type="file" id="upload-b" accept="image/*,.heic,.heif,.HEIC,.HEIF,.avif,.webp,.png,.jpg,.jpeg,.jfif,.bmp,.gif,.tiff,.tif">
+
+            <div class="stage" id="canvas-container">
+
+                <canvas id="main-canvas"></canvas>
+
+            </div>
+
+
+
+            <div class="label">畫布控制</div>
+
+            <div class="btn-group">
+
+                <button class="btn-action" id="btn-rotate-l">↺ 畫布旋轉</button>
+
+                <button class="btn-action" id="btn-rotate-r">↻ 畫布旋轉</button>
+
+                <button class="btn-action" id="btn-obj-rot">↻ 貼圖旋轉</button>
+
+                <button class="btn-danger" id="btn-remove">🗑️ 刪除選取</button>
+
+            </div>
+
+
+
+            <div class="setting-row">
+
+                <div style="display:flex; justify-content: space-between;">
+
+                    <span>輸出品質: <b id="quality-val">80</b>%</span>
+
+                </div>
+
+                <input type="range" id="quality-slider" class="quality-slider" min="0.1" max="1.0" step="0.05" value="0.80">
+
+            </div>
+
+
+
+            <div class="btn-group">
+
+                <button class="btn-success" id="btn-download" disabled style="grid-column: span 2; padding: 15px;">💾 下載 JPG 檔案</button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+<script>
+
+    let cropper;
+
+    const canvas = new fabric.Canvas('main-canvas');
+
+    const imgA = document.getElementById('img-a');
+
+    const btnCrop = document.getElementById('btn-crop');
+
+    const btnDownload = document.getElementById('btn-download');
+
+    const qSlider = document.getElementById('quality-slider');
+
+    const qDisplay = document.getElementById('quality-val');
+
+
+
+    qSlider.oninput = () => qDisplay.innerText = Math.round(qSlider.value * 100);
+
+
+
+    // 通用檔案載入支援 (包含 HEIC 格式解碼)
+    async function readFileAsImage(file) {
+        const ext = (file.name || '').split('.').pop().toLowerCase();
+        const mime = (file.type || '').toLowerCase();
+        const heic = window.heic2any || window.parent?.heic2any;
+        if ((ext === 'heic' || ext === 'heif' || mime === 'image/heic' || mime === 'image/heif') && typeof heic === 'function') {
+            try {
+                const res = await heic({ blob: file, toType: 'image/jpeg', quality: 0.95 });
+                const blob = Array.isArray(res) ? res[0] : res;
+                return await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            } catch (err) {
+                console.warn('HEIC 解碼失敗，嘗試以原生格式讀取:', err);
+            }
+        }
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 1. 初始化裁切工具 (關鍵修正點)
+    document.getElementById('upload-a').onchange = async (e) => {
+        if (!e.target.files[0]) return;
+        try {
+            const dataUrl = await readFileAsImage(e.target.files[0]);
+            imgA.src = dataUrl;
+            if (cropper) cropper.destroy();
+
+            // 設定 Cropper 參數以符合需求
+            cropper = new Cropper(imgA, { 
+                viewMode: 1,           // 限制裁切框不能超出底圖邊界
+                dragMode: 'crop',      // 重要：設定為 'crop' 模式，底圖固定，拖曳即畫新框
+                autoCropArea: 0.5,     // 初始框大小
+                zoomable: false,       // 停用縮放功能
+                movable: false,        // 停用底圖移動
+                rotatable: false,      // 停用底圖旋轉
+                scalable: false,       // 停用底圖翻轉
+                background: true,      // 顯示背景棋盤格 (輔助判斷邊界)
+                modal: true            // 遮蓋裁切區域外的部分
+            });
+            btnCrop.disabled = false;
+        } catch(err) {
+            alert("載入圖片失敗: " + err.message);
+        }
+    };
+
+    // 2. 背景處理
+    document.getElementById('upload-b').onchange = async (e) => {
+        if (!e.target.files[0]) return;
+        try {
+            const dataUrl = await readFileAsImage(e.target.files[0]);
+            fabric.Image.fromURL(dataUrl, (img) => {
+                const containerW = document.getElementById('canvas-container').offsetWidth;
+                const scale = containerW / img.width;
+                canvas.setDimensions({ width: containerW, height: img.height * scale });
+                canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                    scaleX: scale, scaleY: scale,
+                    originX: 'center', originY: 'center',
+                    left: canvas.width / 2, top: canvas.height / 2
+                });
+                btnDownload.disabled = false;
+            });
+        } catch(err) {
+            alert("載入底圖失敗: " + err.message);
+        }
+    };
+
+
+
+    // 3. 裁切置入畫布
+
+    btnCrop.onclick = () => {
+
+        if(!cropper) return;
+
+        const data = cropper.getData();
+
+        const base64 = cropper.getCroppedCanvas().toDataURL();
+
+        fabric.Image.fromURL(base64, (img) => {
+
+            const bg = canvas.backgroundImage;
+
+            if (!bg) {
+
+                const containerW = document.getElementById('canvas-container').offsetWidth;
+
+                const scale = containerW / img.width;
+
+                canvas.setDimensions({ width: containerW, height: img.height * scale });
+
+                img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale });
+
+                btnDownload.disabled = true; // 即使沒背景也能置入，但暫不開放下載(或可自訂)
+
+            } else {
+
+                const s = bg.scaleX;
+
+                img.set({
+
+                    left: data.x * s, top: data.y * s,
+
+                    scaleX: s, scaleY: s
+
+                });
+
+            }
+
+            canvas.add(img);
+
+            canvas.setActiveObject(img);
+
+        });
+
+    };
+
+
+
+    // 4. 畫布旋轉與輸出控制
+
+    function rotateCanvas(direction) {
+
+        const bg = canvas.backgroundImage;
+
+        if (!bg) return;
+
+        const angle = direction === 'right' ? 90 : -90;
+
+        const rad = fabric.util.degreesToRadians(angle);
+
+        const oldW = canvas.width, oldH = canvas.height;
+
+        canvas.setDimensions({ width: oldH, height: oldW });
+
+        bg.rotate((bg.angle + angle) % 360);
+
+        bg.set({ left: canvas.width / 2, top: canvas.height / 2 });
+
+        canvas.getObjects().forEach(obj => {
+
+            const point = new fabric.Point(obj.left, obj.top);
+
+            const center = new fabric.Point(oldW / 2, oldH / 2);
+
+            const newPoint = fabric.util.rotatePoint(point, center, rad);
+
+            const offset = (oldW - oldH) / 2;
+
+            obj.set({ left: newPoint.x - offset, top: newPoint.y + offset, angle: (obj.angle + angle) % 360 });
+
+            obj.setCoords();
+
+        });
+
+        canvas.renderAll();
+
+    }
+
+
+
+    document.getElementById('btn-rotate-l').onclick = () => rotateCanvas('left');
+
+    document.getElementById('btn-rotate-r').onclick = () => rotateCanvas('right');
+
+    document.getElementById('btn-obj-rot').onclick = () => {
+
+        const obj = canvas.getActiveObject();
+
+        if(obj) { obj.rotate((obj.angle + 90) % 360); canvas.renderAll(); }
+
+    };
+
+    document.getElementById('btn-remove').onclick = () => {
+
+        canvas.getActiveObjects().forEach(o => canvas.remove(o));
+
+        canvas.discardActiveObject().renderAll();
+
+    };
+
+
+
+    document.getElementById('btn-download').onclick = async () => {
+
+        const bg = canvas.backgroundImage;
+
+        const quality = parseFloat(qSlider.value);
+
+        canvas.discardActiveObject().renderAll();
+
+        const multiplier = bg ? (1 / bg.scaleX) : 1;
+
+        const link = document.createElement('a');
+
+        link.download = `composite_${Math.round(quality*100)}q.jpg`;
+
+        const outputCanvas = canvas.toCanvasElement(multiplier, { format: 'jpeg', quality: quality });
+        const blob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/jpeg', quality));
+        if (!blob) return alert('圖片輸出失敗，請降低畫質或尺寸後重試');
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    };
+
+</script>
+
+<script src="patch-compose.js"></script>
+</body>
+
+</html>

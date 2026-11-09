@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+
+
+<html lang="zh-TW">
+
+
+<head>
+
+
+    <meta charset="UTF-8">
+
+
+    <title>本地影片播放器</title>
+
+
+    <style>
+
+
+        :root { --primary: #3498db; --record: #e74c3c; --bg: #000; }
+
+
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: white; margin: 0; padding: 0; overflow: hidden; }
+
+
+        
+
+
+        .video-container { 
+
+
+            width: 100vw; height: 100vh; background: #000; 
+
+
+            position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
+
+
+        }
+
+
+
+
+
+        .hide-cursor { cursor: none !important; }
+
+
+        video { width: 100%; max-height: 100%; display: block; cursor: pointer; }
+
+
+
+
+
+        #hud {
+
+
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+
+
+            background: rgba(0,0,0,0.7); padding: 15px 25px; border-radius: 30px;
+
+
+            font-size: 1.2rem; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 100;
+
+
+        }
+
+
+
+
+
+        .controls-panel { 
+
+
+            position: absolute; bottom: 0; left: 0; right: 0;
+
+
+            background: linear-gradient(transparent, rgba(0,0,0,0.9));
+
+
+            padding: 40px 20px 20px; transition: opacity 0.5s, transform 0.5s;
+
+
+            opacity: 0; transform: translateY(20px); z-index: 50;
+
+
+        }
+
+
+        .controls-panel.active { opacity: 1; transform: translateY(0); }
+
+
+
+
+
+        .progress-container { width: 100%; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; cursor: pointer; margin-bottom: 15px; position: relative; }
+
+
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; border-radius: 3px; }
+
+
+
+
+
+        .time-display { font-size: 0.85rem; color: #eee; min-width: 100px; }
+
+
+        .btn-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+
+        .btn-group { display: flex; align-items: center; gap: 12px; }
+
+
+        .btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.2s; }
+
+
+        .btn:hover { background: rgba(255,255,255,0.3); }
+
+
+        .btn.active { background: var(--primary); font-weight: bold; }
+
+
+        
+
+
+        .btn-rec.recording { background: var(--record); animation: blink 1s infinite; }
+
+
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+
+
+
+
+        select.btn { appearance: none; -webkit-appearance: none; padding-right: 25px; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='white'%3E%3Cpath d='M2 4l4 4 4-4z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+
+
+
+
+
+        input[type="range"] { accent-color: var(--primary); width: 80px; cursor: pointer; vertical-align: middle; }
+
+
+
+
+
+        .gallery { position: fixed; bottom: 0; left: 0; width: 100%; display: flex; gap: 10px; overflow-x: auto; padding: 10px; background: rgba(0,0,0,0.9); z-index: 101; transform: translateY(100%); transition: 0.3s; }
+
+
+        .gallery.active { transform: translateY(0); }
+
+
+        .gallery img { height: 80px; border-radius: 4px; border: 1px solid #555; cursor: pointer; }
+
+
+
+
+
+        .top-tools { position: absolute; top: 15px; left: 15px; z-index: 60; display: flex; gap: 10px; transition: opacity 0.5s; opacity: 0; }
+
+
+        .top-tools.active { opacity: 1; }
+
+
+    </style>
+
+
+
+<style>
+    /* 統一現代化分頁區塊高對比風格 CSS 覆寫 */
+    body, html { background-color: #f1f5f9 !important; color: #1e293b !important; font-family: 'Segoe UI', system-ui, sans-serif !important; }
+    
+    /* 側邊欄與主要工作區的底色分離 */
+    .sidebar, .control-panel, .header { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+    .main-view, .workspace, .editor-area, #main-view { background: #f1f5f9 !important; }
+    
+    /* 區塊化設計 (Modular Cards) */
+    .tool-group, .card, .container, .box, .modal { 
+        background: #ffffff !important; 
+        border-radius: 16px !important; 
+        border: 1px solid #e2e8f0 !important; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03) !important; 
+        padding: 24px !important; 
+        margin-bottom: 24px !important; 
+        color: #1e293b !important;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .tool-group:hover, .card:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04) !important; }
+    
+    h1, h2, h3, h4, h5, h6 { color: #0f172a !important; text-shadow: none !important; font-weight: 700 !important; }
+    h3 { border-bottom: 2px solid #f1f5f9 !important; padding-bottom: 12px !important; margin-bottom: 20px !important; border-left: none !important; }
+    label { color: #475569 !important; font-weight: 600 !important; margin-bottom: 8px !important; display: block; }
+    
+    /* 全局通用按鈕 (顯眼化) */
+    button, .custom-file-upload { 
+        background: #ffffff !important; color: #334155 !important; border: 1px solid #cbd5e1 !important; 
+        border-radius: 8px !important; padding: 10px 16px !important; font-size: 14px !important; font-weight: 600 !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; cursor: pointer;
+    }
+    button:hover { background: #f8fafc !important; border-color: #94a3b8 !important; color: #0f172a !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08) !important; }
+    button:active { transform: translateY(0px) !important; }
+    select, input { background: #ffffff !important; color: #1e293b !important; border: 1px solid #cbd5e1 !important; border-radius: 8px !important; padding: 10px 16px !important; transition: 0.2s !important; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02) !important; }
+    select:focus, input:focus { border-color: #3b82f6 !important; outline: none !important; box-shadow: 0 0 0 3px rgba(59,130,246,0.3) !important; }
+    
+    /* 核心主打按鈕 (極致顯眼) */
+    button[style*="success"], button[style*="purple"], button[style*="orange"], button[style*="dark-green"], button[id*="startBtn"], button[id*="recordBtn"], button.btn-generate, button[onclick*="imagesToPdf"], button[onclick*="batch"], button[onclick*="processAction"], .btn-primary, .btn-success, .btn-grey { 
+        background: #2563eb !important; color: white !important; border: none !important; 
+        box-shadow: 0 4px 10px rgba(37,99,235,0.3) !important; 
+    }
+    button[style*="success"]:hover, button[style*="purple"]:hover, button[style*="orange"]:hover, button[style*="dark-green"]:hover, button[id*="startBtn"]:hover, button.btn-generate:hover, button[onclick*="batch"]:hover, button[onclick*="processAction"]:hover, .btn-primary:hover, .btn-success:hover, .btn-grey:hover { 
+        background: #1d4ed8 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(37,99,235,0.4) !important; 
+    }
+    button[style*="danger"], button.accent, button.active-mode, .btn-danger { background: #ef4444 !important; color: white !important; border: none !important; box-shadow: 0 4px 10px rgba(239,68,68,0.3) !important; }
+    button[style*="danger"]:hover, button.accent:hover, .btn-danger:hover { background: #dc2626 !important; transform: translateY(-2px) !important; }
+    
+    /* 畫布與影片 (Canvas & Video) */
+    canvas { background: #ffffff !important; border: 1px dashed #cbd5e1 !important; border-radius: 12px !important; }
+    canvas.upper-canvas { background: transparent !important; border: none !important; }
+    #preview, video { border-radius: 12px !important; box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important; background: #000 !important; }
+    .video-container { background: #000 !important; border-radius: 12px; overflow: hidden; }
+    
+    /* 其他輔助線條 */
+    .thumb-bar { background: #ffffff !important; border-top: 1px solid #e2e8f0 !important; }
+    .thumb-item { border: 2px solid transparent !important; border-radius: 8px !important; opacity: 0.6; transition: 0.2s; }
+    .thumb-item.active { border-color: #2563eb !important; opacity: 1; box-shadow: 0 0 8px rgba(37,99,235,0.4); }
+    .thumb-item:hover { opacity: 0.9; }
+    .divider, hr { border-color: #e2e8f0 !important; border-bottom: 0 !important; margin: 20px 0 !important; }
+    .info, .tool-label, span { color: #64748b !important; text-shadow: none !important; }
+    input[type="range"] { accent-color: #2563eb; }
+    
+    /* PDF Viewer specific overrides */
+    #pdfPreview { background-color: #f1f5f9 !important; }
+    .pdf-page-container { background: white !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; overflow: hidden; }
+    
+    /* Hide some outdated UI borders */
+    .btn-row, .tool-group { border-color: #e2e8f0 !important; }
+    .status-box { color: #475569 !important; }
+</style>
+</head>
+
+
+<body>
+
+
+
+
+
+    <div class="top-tools" id="topTools">
+
+
+        <input type="file" id="fileInput" accept="video/*" style="display:none">
+
+
+        <button class="btn" onclick="document.getElementById('fileInput').click()">📂 開啟檔案</button>
+
+
+        <button class="btn" onclick="document.getElementById('gallery').classList.toggle('active')">🖼️ 截圖庫</button>
+
+
+        
+
+
+        <select id="recQuality" class="btn">
+
+
+            <option value="2500000">標準錄影 (2.5Mbps)</option>
+
+
+            <option value="8000000" selected>高品質錄影 (8Mbps)</option>
+
+
+            <option value="15000000">極致錄影 (15Mbps)</option>
+
+
+        </select>
+
+
+    </div>
+
+
+
+
+
+    <div class="video-container" id="videoWrapper">
+
+
+        <div id="hud"></div>
+
+
+        <video id="mainVideo" onclick="togglePlay()" crossorigin="anonymous"></video>
+
+
+        
+
+
+        <div class="controls-panel" id="controlsPanel">
+
+
+            <div class="progress-container" id="progressContainer">
+
+
+                <div class="progress-bar" id="progressBar"></div>
+
+
+            </div>
+
+
+            <div class="btn-row">
+
+
+                <div class="btn-group">
+
+
+                    <button class="btn" onclick="togglePlay()" id="playBtn">▶</button>
+
+
+                    <div class="time-display"><span id="currTime">00:00</span> / <span id="durTime">00:00</span></div>
+
+
+                </div>
+
+
+                <div class="btn-group" id="speedGroup">
+
+
+                    <button class="btn active" onclick="adjustSpeed(1.0, this)">1.0x</button>
+
+
+                    <button class="btn" onclick="adjustSpeed(1.5, this)">1.5x</button>
+
+
+                    <button class="btn" onclick="adjustSpeed(2.0, this)">2.0x</button>
+
+
+                    <button class="btn" onclick="adjustSpeed(3.0, this)">3.0x</button>
+
+
+                </div>
+
+
+                <div class="btn-group">
+
+
+                    <span id="volIcon" style="cursor:pointer" onclick="toggleMute()">🔊</span>
+
+
+                    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
+
+
+                    <button class="btn" id="recBtn" onclick="toggleRecording()">🔴</button>
+
+
+                    <button class="btn" onclick="takeSnapshot()">📷</button>
+
+
+                    <button class="btn" onclick="toggleFullScreen()">⛶</button>
+
+
+                </div>
+
+
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+
+
+
+
+    <div class="gallery" id="gallery"></div>
+
+
+    <canvas id="snapshotCanvas" style="display:none"></canvas>
+
+
+
+
+
+    <script>
+
+
+        const video = document.getElementById('mainVideo');
+
+
+        const wrapper = document.getElementById('videoWrapper');
+
+
+        const controls = document.getElementById('controlsPanel');
+
+
+        const topTools = document.getElementById('topTools');
+
+
+        const hud = document.getElementById('hud');
+
+
+        const playBtn = document.getElementById('playBtn');
+
+
+        const recBtn = document.getElementById('recBtn');
+
+
+        const progressBar = document.getElementById('progressBar');
+
+
+        const progressContainer = document.getElementById('progressContainer');
+
+
+        const volumeSlider = document.getElementById('volumeSlider');
+
+
+        const volIcon = document.getElementById('volIcon');
+
+
+        
+
+
+        let hideTimeout;
+
+
+        let prevVol = 0.5;
+
+
+        let mediaRecorder;
+
+
+        let recordedChunks = [];
+
+
+        let isRecording = false;
+        let currentVideoUrl = null;
+        let previewObjectUrl = null;
+
+        function canvasToBlob(canvas, type, quality) {
+            return new Promise((resolve, reject) => {
+                canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('圖片輸出失敗')), type, quality);
+            });
+        }
+
+
+
+
+
+        // --- 自動隱藏邏輯 ---
+
+
+        function showUI() {
+
+
+            controls.classList.add('active');
+
+
+            topTools.classList.add('active');
+
+
+            wrapper.classList.remove('hide-cursor');
+
+
+            clearTimeout(hideTimeout);
+
+
+            
+
+
+            if (!video.paused && !isRecording) {
+
+
+                hideTimeout = setTimeout(() => {
+
+
+                    controls.classList.remove('active');
+
+
+                    topTools.classList.remove('active');
+
+
+                    wrapper.classList.add('hide-cursor');
+
+
+                }, 3000);
+
+
+            }
+
+
+        }
+
+
+
+
+
+        wrapper.addEventListener('mousemove', showUI);
+
+
+        window.addEventListener('keydown', showUI);
+
+
+        video.addEventListener('play', showUI);
+
+
+        video.addEventListener('pause', showUI);
+
+
+
+
+
+        // --- 錄影邏輯 (帶有品質選單) ---
+
+
+        function toggleRecording() {
+
+
+            if (!isRecording) startRecording();
+
+
+            else stopRecording();
+
+
+        }
+
+
+
+
+
+        function startRecording() {
+            if (!video.src || video.readyState < 2) {
+                showHUD("請先載入可播放的影片");
+                return;
+            }
+
+
+            recordedChunks = [];
+
+
+            const captureStream = video.captureStream || video.mozCaptureStream;
+            if (!captureStream) {
+                showHUD("此瀏覽器不支援影片擷取");
+                return;
+            }
+            const stream = captureStream.call(video);
+
+
+            
+
+
+            // 讀取選單設定的位元率
+
+
+            const bitrate = parseInt(document.getElementById('recQuality').value);
+
+
+            
+
+
+            const options = { 
+
+
+                mimeType: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(type => typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)) || '',
+
+
+                videoBitsPerSecond: bitrate
+
+
+            };
+
+
+
+
+
+            try {
+
+
+                mediaRecorder = new MediaRecorder(stream, options);
+                if (!options.mimeType) delete options.mimeType;
+
+
+            } catch (e) {
+
+
+                console.warn("VP9 不支援，嘗試預設編碼");
+
+
+                stream.getTracks().forEach(track => track.stop());
+                showHUD("無法啟動影片錄影");
+                return;
+
+
+            }
+
+
+
+
+
+            mediaRecorder.ondataavailable = (e) => {
+
+
+                if (e.data.size > 0) recordedChunks.push(e.data);
+
+
+            };
+
+
+
+
+
+            mediaRecorder.onstop = () => {
+                isRecording = false;
+                recBtn.classList.remove('recording');
+                recBtn.innerText = "🔴";
+
+
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+
+
+                const url = URL.createObjectURL(blob);
+                if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+                previewObjectUrl = url;
+
+
+                const a = document.createElement('a');
+
+
+                a.href = url;
+
+
+                a.download = `Rec_${Date.now()}.webm`;
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                stream.getTracks().forEach(track => track.stop());
+
+
+                a.click();
+
+
+                showHUD("💾 錄製完成並儲存");
+
+
+            };
+
+
+
+
+
+            mediaRecorder.start(1000);
+
+
+            isRecording = true;
+
+
+            recBtn.classList.add('recording');
+
+
+            recBtn.innerText = "⏹";
+
+
+            showHUD(`🔴 錄製中 (${bitrate/1000000}M)`);
+
+
+        }
+
+
+
+
+
+        function stopRecording() {
+
+
+            mediaRecorder.stop();
+
+
+            isRecording = false;
+
+
+            recBtn.classList.remove('recording');
+
+
+            recBtn.innerText = "🔴";
+
+
+        }
+
+
+
+
+
+        // --- 播放器核心功能 ---
+
+
+        volumeSlider.addEventListener('input', (e) => {
+
+
+            video.volume = e.target.value;
+
+
+            video.muted = (video.volume == 0);
+
+
+            updateVolUI();
+
+
+        });
+
+
+
+
+
+        function updateVolUI() {
+
+
+            if (video.muted || video.volume == 0) volIcon.innerText = "🔇";
+
+
+            else if (video.volume < 0.5) volIcon.innerText = "🔉";
+
+
+            else volIcon.innerText = "🔊";
+
+
+        }
+
+
+
+
+
+        function toggleMute() {
+
+
+            if (video.volume > 0) {
+
+
+                prevVol = video.volume;
+
+
+                video.volume = 0;
+
+
+                volumeSlider.value = 0;
+
+
+            } else {
+
+
+                video.volume = prevVol || 0.5;
+
+
+                volumeSlider.value = video.volume;
+
+
+            }
+
+
+            updateVolUI();
+
+
+        }
+
+
+
+
+
+        function formatTime(s) {
+
+
+            const m = Math.floor(s / 60);
+
+
+            const sec = Math.floor(s % 60);
+
+
+            return (m < 10 ? "0" + m : m) + ":" + (sec < 10 ? "0" + sec : sec);
+
+
+        }
+
+
+
+
+
+        video.ontimeupdate = () => {
+
+
+            const percent = (video.currentTime / video.duration) * 100;
+
+
+            progressBar.style.width = percent + "%";
+
+
+            document.getElementById('currTime').innerText = formatTime(video.currentTime);
+
+
+        };
+
+
+
+
+
+        video.onloadedmetadata = () => {
+
+
+            document.getElementById('durTime').innerText = formatTime(video.duration);
+
+
+        };
+
+
+
+
+
+        progressContainer.onclick = (e) => {
+
+
+            const rect = progressContainer.getBoundingClientRect();
+
+
+            video.currentTime = ((e.clientX - rect.left) / rect.width) * video.duration;
+
+
+        };
+
+
+
+
+
+        function showHUD(text) {
+
+
+            hud.innerText = text; hud.style.opacity = 1;
+
+
+            setTimeout(() => hud.style.opacity = 0, 800);
+
+
+        }
+
+
+
+
+
+        function togglePlay() {
+
+
+            if (video.paused) { video.play(); playBtn.innerText = "Ⅱ"; }
+
+
+            else { video.pause(); playBtn.innerText = "▶"; }
+
+
+            showUI();
+
+
+        }
+
+
+
+
+
+        function adjustSpeed(s, btn) {
+
+
+            video.playbackRate = s;
+
+
+            showHUD(`${s}x 速度`);
+
+
+            document.querySelectorAll('#speedGroup .btn').forEach(b => b.classList.remove('active'));
+
+
+            if(btn) btn.classList.add('active');
+
+
+        }
+
+
+
+
+
+        function toggleFullScreen() {
+
+
+            if (!document.fullscreenElement) wrapper.requestFullscreen().catch(e=>alert("全螢幕失敗"));
+
+
+            else document.exitFullscreen();
+
+
+        }
+
+
+
+
+
+        document.getElementById('fileInput').onchange = (e) => {
+
+
+            const file = e.target.files[0];
+
+
+            if (file) { video.src = URL.createObjectURL(file); video.play(); playBtn.innerText = "Ⅱ"; }
+
+
+        };
+
+
+
+
+
+        document.getElementById('fileInput').addEventListener('change', () => {
+            if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
+            currentVideoUrl = video.src;
+        });
+
+        function takeSnapshot() {
+            if (!video.videoWidth || !video.videoHeight) {
+                showHUD("影片載入後才能截圖");
+                return;
+            }
+
+
+            const canvas = document.getElementById('snapshotCanvas');
+
+
+            const ctx = canvas.getContext('2d');
+
+
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+
+            const img = document.createElement('img');
+
+
+            img.src = canvas.toDataURL('image/jpeg', 0.8);
+
+
+            img.onclick = () => { const a = document.createElement('a'); a.href = img.src; a.download = 'shot.jpg'; a.click(); };
+
+
+            document.getElementById('gallery').prepend(img);
+
+
+            showHUD("📸 截圖成功");
+
+
+        }
+
+
+
+
+
+        window.onkeydown = (e) => {
+
+
+            if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+
+
+            if (e.code === 'ArrowRight') { video.currentTime += 5; showHUD("+5s"); }
+
+
+            if (e.code === 'ArrowLeft') { video.currentTime -= 5; showHUD("-5s"); }
+
+
+            if (e.code === 'KeyF') toggleFullScreen();
+
+
+            if (e.code === 'KeyS') takeSnapshot();
+
+
+            if (e.code === 'KeyR') toggleRecording();
+
+
+        };
+
+
+
+
+
+        showUI();
+
+
+    </script>
+
+
+<script>
+/* ===== PWA 擴充：快捷鍵、記憶播放位置、拖放、子母畫面、循環 ===== */
+(()=>{
+  const fi=document.getElementById('fileInput');let key=null,lastSave=0;
+  const speeds=[0.25,0.5,0.75,1,1.25,1.5,2,3,4];
+  fi.addEventListener('change',()=>{const f=fi.files[0];if(!f)return;key='player:pos:'+f.name+':'+f.size;document.title=f.name});
+  video.addEventListener('loadedmetadata',()=>{if(!key)return;const t=parseFloat(localStorage.getItem(key)||0);
+    if(t>5&&t<video.duration-5){video.currentTime=t;showHUD('已從 '+formatTime(t)+' 繼續')}});
+  video.addEventListener('timeupdate',()=>{if(!key||Date.now()-lastSave<2000)return;lastSave=Date.now();
+    try{localStorage.setItem(key,video.currentTime)}catch(e){}});
+  video.addEventListener('ended',()=>{if(key)try{localStorage.removeItem(key)}catch(e){}});
+  const vol=d=>{video.volume=Math.max(0,Math.min(1,video.volume+d));volumeSlider.value=video.volume;updateVolUI();showHUD('音量 '+Math.round(video.volume*100)+'%')};
+  addEventListener('keydown',e=>{
+    if(e.ctrlKey||e.metaKey||e.altKey||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range')return;
+    const c=e.code;
+    if(c==='ArrowUp'){e.preventDefault();vol(.05)}
+    else if(c==='ArrowDown'){e.preventDefault();vol(-.05)}
+    else if(c==='KeyM')toggleMute();
+    else if(c==='KeyL'){video.loop=!video.loop;showHUD(video.loop?'循環播放：開':'循環播放：關')}
+    else if(c==='KeyP'){document.pictureInPictureElement?document.exitPictureInPicture():video.requestPictureInPicture&&video.requestPictureInPicture().catch(()=>showHUD('無法開啟子母畫面'))}
+    else if(c==='Period'){video.pause();video.currentTime+=1/30;showHUD('下一格')}
+    else if(c==='Comma'){video.pause();video.currentTime-=1/30;showHUD('上一格')}
+    else if(c==='BracketRight'||c==='BracketLeft'){let i=speeds.indexOf(video.playbackRate);if(i<0)i=3;i=Math.max(0,Math.min(speeds.length-1,i+(c==='BracketRight'?1:-1)));adjustSpeed(speeds[i])}
+    else if(/^Digit[0-9]$/.test(c)&&video.duration){video.currentTime=video.duration*(+c.slice(5))/10}
+  });
+  video.addEventListener('dblclick',toggleFullScreen);
+  ['dragover','drop'].forEach(n=>addEventListener(n,e=>{e.preventDefault();if(n==='drop'){const f=[...e.dataTransfer.files].find(x=>x.type.startsWith('video/'));
+    if(f){const dt=new DataTransfer();dt.items.add(f);fi.files=dt.files;fi.dispatchEvent(new Event('change'))}}}));
+  if('mediaSession' in navigator){const m=navigator.mediaSession;m.setActionHandler('play',()=>video.play());m.setActionHandler('pause',()=>video.pause());
+    m.setActionHandler('seekforward',()=>video.currentTime+=10);m.setActionHandler('seekbackward',()=>video.currentTime-=10)}
+})();
+</script>
+</body>
+
+
+</html>

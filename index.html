@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>全能工具</title>
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="離線可用的圖片、PDF、QR Code、影片與螢幕錄影工具箱">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="全能工具">
+<style>
+:root{--bg:#f8f9fa;--fg:#212529;--mut:#6c757d;--line:#eaeaea;--pri:#0d6efd;--card:#fff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg);font-family:'Segoe UI',Tahoma,'Microsoft JhengHei','PingFang TC',sans-serif}
+body{display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+header{background:var(--card);padding:8px 14px;box-shadow:0 1px 5px rgba(0,0,0,.05);display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);z-index:10}
+.logo{font-weight:800;font-size:17px;white-space:nowrap;display:flex;gap:6px;align-items:center}
+nav{display:flex;gap:6px;overflow-x:auto;flex:1;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+.tab{background:transparent;border:0;padding:8px 12px;font:600 14px inherit;font-family:inherit;color:var(--mut);border-radius:8px;cursor:pointer;white-space:nowrap}
+.tab:hover{background:#f1f3f5;color:#495057}
+.tab.active{background:#f0f7ff;color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
+.tools{display:flex;gap:8px;align-items:center}
+.pill{font-size:12px;padding:3px 8px;border-radius:99px;background:#fff3cd;color:#8a6d00;display:none}
+.pill.show{display:inline-block}
+.ibtn{border:1px solid #ced4da;background:#fff;border-radius:8px;padding:6px 10px;font:600 13px inherit;font-family:inherit;cursor:pointer;display:none}
+.ibtn.show{display:inline-block}
+select.m{display:none;flex:1;padding:10px 12px;font-size:16px;font-weight:700;border-radius:8px;border:1px solid #ced4da;background:#f8f9fa}
+main{flex:1;position:relative;min-height:0}
+iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg)}
+iframe.active{display:block}
+#toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#212529;color:#fff;padding:10px 14px;border-radius:10px;display:none;gap:12px;align-items:center;z-index:50;font-size:14px;max-width:92vw}
+#toast.show{display:flex}
+#toast button{background:#0d6efd;border:0;color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit}
+#drop{position:fixed;inset:0;background:rgba(13,110,253,.12);border:3px dashed var(--pri);display:none;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--pri);z-index:60;pointer-events:none}
+#drop.show{display:flex}
+dialog{border:0;border-radius:14px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.25);max-width:92vw}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog h3{margin:0 0 6px}dialog p{margin:0 0 12px;color:var(--mut);font-size:13px}
+dialog .opts{display:grid;gap:8px}
+dialog .opts button{padding:12px;border-radius:10px;border:1px solid #ced4da;background:#fff;font:600 15px inherit;font-family:inherit;cursor:pointer;text-align:left}
+dialog .opts button:hover{background:#f0f7ff;border-color:var(--pri)}
+@media(max-width:768px){nav{display:none}select.m{display:block}.logo span.t{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🧰<span class="t">全能工具</span></div>
+  <nav id="nav"></nav>
+  <select class="m" id="msel" aria-label="選擇工具"></select>
+  <div class="tools">
+    <span class="pill" id="offline">離線中</span>
+    <button class="ibtn" id="install">安裝 App</button>
+  </div>
+</header>
+<main id="main"></main>
+<div id="toast"><span id="toastMsg"></span><button id="toastBtn">重新整理</button></div>
+<div id="drop">放開以開啟檔案</div>
+<dialog id="dlg"><h3>用哪個工具開啟？</h3><p id="dlgInfo"></p><div class="opts" id="dlgOpts"></div></dialog>
+
+<script>
+const TOOLS=[
+ {id:'image',  name:'圖片工具',          src:'tools/image.html'},
+ {id:'pdf',    name:'PDF工具',           src:'tools/pdf.html'},
+ {id:'viewer', name:'看圖及裁切塗鴨工具',  src:'tools/viewer.html'},
+ {id:'compose',name:'圖片合成工具',        src:'tools/compose.html'},
+ {id:'qr',     name:'QR Code',             src:'tools/qr.html'},
+ {id:'player', name:'影片播放器',          src:'tools/player.html'},
+ {id:'record', name:'螢幕錄影',            src:'tools/record.html'}
+];
+const ALLOW='display-capture; camera; microphone; fullscreen; clipboard-read; clipboard-write; autoplay; picture-in-picture';
+// 檔案類型 → 可開啟的工具與其 file input
+const OPEN_WITH={
+ image:[{t:0,sel:'#convFiles',label:'圖片工具（轉檔／壓縮）'},{t:2,sel:'#fileInput',label:'看圖及裁切塗鴨'},{t:3,sel:'#upload-a',label:'圖片合成工具'}],
+ pdf:[{t:1,sel:'#mainFile',label:'PDF工具'}],
+ video:[{t:5,sel:'#fileInput',label:'影片播放器'}]
+};
+const $=id=>document.getElementById(id);
+const nav=$('nav'),msel=$('msel'),main=$('main');
+let current=-1;
+
+TOOLS.forEach((t,i)=>{
+  const b=document.createElement('button');b.className='tab';b.id='btn'+i;b.textContent=t.name;
+  b.title='Alt+'+(i+1);b.onclick=()=>showTool(i);nav.appendChild(b);
+  const o=document.createElement('option');o.value=i;o.textContent=t.name;msel.appendChild(o);
+  const f=document.createElement('iframe');f.id='frame'+i;f.setAttribute('allow',ALLOW);f.title=t.name;main.appendChild(f);
+});
+msel.onchange=()=>showTool(+msel.value);
+
+function loadFrame(i){const f=$('frame'+i);if(!f.getAttribute('src'))f.src=TOOLS[i].src;return f}
+function showTool(i,opts={}){
+  i=Number(i);if(!Number.isInteger(i)||i<0||i>=TOOLS.length)return;
+  TOOLS.forEach((_,k)=>{$('frame'+k).classList.toggle('active',k===i);$('btn'+k).classList.toggle('active',k===i)});
+  loadFrame(i);msel.value=i;current=i;
+  document.title=TOOLS[i].name+' - 全能工具';
+  try{localStorage.setItem('ws:last',TOOLS[i].id)}catch(e){}
+  if(!opts.noHash)history.replaceState(null,'','#'+TOOLS[i].id);
+}
+function fromHash(){const id=location.hash.slice(1);const i=TOOLS.findIndex(t=>t.id===id);return i}
+
+/* ---------- 把檔案送進工具 ---------- */
+function frameReady(f){return new Promise(res=>{
+  const ok=()=>{try{return f.getAttribute('src')&&f.contentWindow.location.href!=='about:blank'&&f.contentDocument.readyState==='complete'&&f.contentDocument.body}catch(e){return false}};
+  if(ok())return res();f.addEventListener('load',()=>setTimeout(res,150),{once:true});
+});}
+async function sendFiles(target,files){
+  showTool(target.t);const f=$('frame'+target.t);await frameReady(f);
+  const inp=f.contentDocument.querySelector(target.sel);
+  if(!inp){toast('此工具暫時無法接收檔案');return}
+  const dt=new DataTransfer();(inp.multiple?files:[files[0]]).forEach(x=>dt.items.add(x));
+  inp.files=dt.files;inp.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function kindOf(file){
+  if(file.type.startsWith('video/'))return 'video';
+  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name))return 'pdf';
+  if(file.type.startsWith('image/')||/\.(heic|heif|avif|webp|png|jpe?g|jfif|bmp|gif|tiff?|svg|ico)$/i.test(file.name))return 'image';
+  return null;
+}
+function routeFiles(list){
+  const files=[...list];if(!files.length)return;
+  const kind=kindOf(files[0]);const opts=kind&&OPEN_WITH[kind];
+  if(!opts){toast('不支援的檔案類型');return}
+  const same=files.filter(f=>kindOf(f)===kind);
+  if(opts.length===1)return sendFiles(opts[0],same);
+  $('dlgInfo').textContent=same.length+' 個檔案';const box=$('dlgOpts');box.innerHTML='';
+  opts.forEach(o=>{const b=document.createElement('button');b.textContent=o.label;
+    b.onclick=()=>{$('dlg').close();sendFiles(o,same)};box.appendChild(b)});
+  $('dlg').showModal();
+}
+/* 拖放：整個視窗（iframe 內的拖放仍由各工具自己處理） */
+let dragDepth=0;
+addEventListener('dragenter',e=>{if([...e.dataTransfer.types].includes('Files')){dragDepth++;$('drop').classList.add('show')}});
+addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)$('drop').classList.remove('show')});
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();dragDepth=0;$('drop').classList.remove('show');routeFiles(e.dataTransfer.files)});
+
+/* ---------- 其他 PWA 功能 ---------- */
+function toast(msg,btn,fn){$('toastMsg').textContent=msg;const b=$('toastBtn');b.style.display=btn?'':'none';
+  if(btn){b.textContent=btn;b.onclick=fn}$('toast').classList.add('show');if(!btn)setTimeout(()=>$('toast').classList.remove('show'),2600)}
+function updOnline(){$('offline').classList.toggle('show',!navigator.onLine)}
+addEventListener('online',updOnline);addEventListener('offline',updOnline);updOnline();
+
+let deferred=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('install').classList.add('show')});
+$('install').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('install').classList.remove('show')};
+addEventListener('appinstalled',()=>$('install').classList.remove('show'));
+
+addEventListener('keydown',e=>{
+  if(e.altKey&&/^[1-7]$/.test(e.key)){e.preventDefault();showTool(+e.key-1)}
+});
+addEventListener('hashchange',()=>{const i=fromHash();if(i>=0&&i!==current)showTool(i,{noHash:true})});
+
+if('launchQueue' in window){
+  launchQueue.setConsumer(async p=>{if(!p.files||!p.files.length)return;routeFiles(await Promise.all(p.files.map(h=>h.getFile())))});
+}
+
+/* Service Worker + 分享目標 */
+async function pullShared(){
+  const q=new URLSearchParams(location.search);if(!q.get('shared'))return;
+  const c=await caches.open('ws-share-inbox');const reqs=await c.keys();const files=[];
+  for(const r of reqs){const res=await c.match(r);const b=await res.blob();
+    files.push(new File([b],decodeURIComponent(res.headers.get('x-name')||'shared'),{type:b.type}));await c.delete(r)}
+  history.replaceState(null,'',location.pathname+location.hash);routeFiles(files);
+}
+if('serviceWorker' in navigator){
+  addEventListener('load',async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register('sw.js');
+      const ask=w=>toast('有新版本可用','更新',()=>w.postMessage('SKIP_WAITING'));
+      if(reg.waiting&&navigator.serviceWorker.controller)ask(reg.waiting);
+      reg.addEventListener('updatefound',()=>{const w=reg.installing;
+        w&&w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)ask(w)})});
+      let rl=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(rl)return;rl=true;location.reload()});
+      navigator.serviceWorker.ready.then(()=>{if(!localStorage.getItem('ws:cached')){localStorage.setItem('ws:cached','1');toast('已可離線使用 ✓')}});
+    }catch(e){console.warn('SW 註冊失敗',e)}
+    pullShared();
+  });
+}
+
+/* 啟動：hash > 上次使用 > 第一個 */
+(()=>{let i=fromHash();
+  if(i<0){try{i=TOOLS.findIndex(t=>t.id===localStorage.getItem('ws:last'))}catch(e){}}
+  showTool(i<0?0:i);
+})();
+</script>
+</body>
+</html>

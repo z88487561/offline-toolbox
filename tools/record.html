@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>螢幕錄影</title>
+<style>
+
+        body { --primary: #007bff; --success: #28a745; --danger: #dc3545; }
+
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background-color: #e9ecef; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+
+        .card { background: white; padding: 25px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); width: 90%; max-width: 450px; }
+
+        h2 { margin: 0 0 20px 0; color: #333; text-align: center; font-size: 1.5rem; }
+
+        .setting-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+
+        .setting-group { text-align: left; }
+
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #666; font-size: 0.85rem; }
+
+        select { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+
+        video { width: 100%; background: #222; border-radius: 8px; margin: 15px 0; aspect-ratio: 16 / 9; object-fit: contain; border: 2px solid #ddd; }
+
+        .status-box { text-align: center; margin-bottom: 15px; font-size: 0.9rem; font-weight: bold; color: #555; }
+
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #bbb; margin-right: 6px; display: inline-block; }
+
+        .recording .dot { background: var(--danger); animation: blink 1s infinite; }
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        button { padding: 12px; font-size: 1rem; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; font-weight: bold; }
+
+        #startBtn { background: var(--success); color: white; }
+
+        #stopBtn { background: var(--danger); color: white; }
+
+        button:disabled { background: #ccc !important; cursor: not-allowed; }
+
+        .hint { font-size: 0.75rem; color: #999; margin-top: 15px; text-align: center; line-height: 1.5; }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style></head><body>
+                
+
+
+
+<div class="card">
+
+    <h2>📽️ 極簡錄影 (優化版)</h2>
+
+    
+
+    <div class="setting-row">
+
+        <div class="setting-group">
+
+            <label>畫質位元率</label>
+
+            <select id="quality">
+
+                <option value="1200000">1.2 Mbps (極小)</option>
+
+                <option value="2500000" selected>2.5 Mbps (清晰)</option>
+
+                <option value="5000000">5.0 Mbps (高標)</option>
+
+            </select>
+
+        </div>
+
+        <div class="setting-group">
+
+            <label>流暢度 (FPS)</label>
+
+            <select id="fps">
+
+                <option value="15">15 FPS</option>
+
+                <option value="24" selected>24 FPS (推薦)</option>
+
+                <option value="30">30 FPS</option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="setting-group" style="margin-bottom: 15px;">
+
+        <label>解析度上限</label>
+
+        <select id="resolution">
+
+            <option value="640">480p (最小體積)</option>
+
+            <option value="1280" selected>720p (HD 推薦)</option>
+
+            <option value="1920">1080p (FHD 高清)</option>
+
+        </select>
+
+    </div>
+
+
+
+    <video id="preview" autoplay muted></video>
+
+
+
+    <div class="status-box" id="statusContainer">
+
+        <span class="dot"></span><span id="statusText">系統待命</span>
+
+    </div>
+
+
+
+    <div class="setting-row" style="margin-top:4px">
+        <label style="font-weight:600"><input type="checkbox" id="micOn"> 同時錄製麥克風</label>
+        <label style="font-weight:600"><input type="checkbox" id="cdOn" checked> 開始前倒數 3 秒</label>
+    </div>
+    <div class="controls">
+
+        <button id="startBtn">開始錄製 (F2)</button>
+
+        <button id="stopBtn" disabled>停止錄製 (F2)</button>
+        <button id="pauseBtn" disabled style="grid-column:1/3;background:#6c757d;color:#fff">暫停 (F3)</button>
+
+    </div>
+
+
+
+    <div class="hint">
+
+        <b>VP9 編碼優勢：</b> 畫面靜止時幾乎不佔空間<br>
+
+        提示：按 <b>F2</b> 快速切換狀態
+
+    </div>
+
+</div>
+
+
+
+<script>
+(() => {
+
+
+    const startBtn = document.getElementById('startBtn');
+
+    const stopBtn = document.getElementById('stopBtn');
+
+    const preview = document.getElementById('preview');
+
+    const statusText = document.getElementById('statusText');
+
+    const statusContainer = document.getElementById('statusContainer');
+
+    const qualitySelect = document.getElementById('quality');
+
+    const fpsSelect = document.getElementById('fps');
+
+    const resSelect = document.getElementById('resolution');
+
+
+
+    let mediaRecorder;
+
+    let recordedChunks = [];
+
+
+
+    async function mixMic(display) {
+        const ctx = new AudioContext();
+        const dest = ctx.createMediaStreamDestination();
+        const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        ctx.createMediaStreamSource(mic).connect(dest);
+        if (display.getAudioTracks().length) ctx.createMediaStreamSource(new MediaStream(display.getAudioTracks())).connect(dest);
+        const out = new MediaStream([...display.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+        out._extra = [mic, ctx];
+        return out;
+    }
+    const pauseBtn = document.getElementById('pauseBtn');
+    let t0 = 0, acc = 0, tick = null;
+    const fmt = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+    function startTimer() { acc = 0; t0 = Date.now(); clearInterval(tick); tick = setInterval(() => { if (mediaRecorder && mediaRecorder.state === 'recording') statusText.innerText = '正在錄製… ' + fmt(acc + (Date.now() - t0) / 1000); }, 500); }
+    function togglePause() {
+        if (!mediaRecorder) return;
+        if (mediaRecorder.state === 'recording') { mediaRecorder.pause(); acc += (Date.now() - t0) / 1000; pauseBtn.innerText = '繼續 (F3)'; statusText.innerText = '已暫停 ' + fmt(acc); }
+        else if (mediaRecorder.state === 'paused') { mediaRecorder.resume(); t0 = Date.now(); pauseBtn.innerText = '暫停 (F3)'; }
+    }
+    async function toggleRecording() {
+
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+
+            await startRecording();
+
+        } else {
+
+            stopRecording();
+
+        }
+
+    }
+
+
+
+    async function startRecording() {
+        let stream;
+
+        try {
+
+            const selectedFps = parseInt(fpsSelect.value);
+
+            const selectedRes = parseInt(resSelect.value);
+
+            const selectedBitrate = parseInt(qualitySelect.value);
+
+
+
+            // 1. 擷取螢幕與音訊串流
+
+            const constraints = {
+
+                video: { 
+
+                    width: { ideal: selectedRes },
+
+                    frameRate: { ideal: selectedFps, max: selectedFps }
+
+                },
+
+                audio: {
+
+                    echoCancellation: true,
+
+                    noiseSuppression: true,
+
+                    sampleRate: 44100
+
+                }
+
+            };
+
+
+
+            stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+            if (document.getElementById('micOn').checked) {
+                try { stream = await mixMic(stream); }
+                catch (e) { statusText.innerText = '無法使用麥克風，僅錄製分享的音訊'; }
+            }
+
+            preview.srcObject = stream;
+
+            recordedChunks = [];
+
+
+
+            // 2. 配置 MediaRecorder (VP9 是目前瀏覽器壓縮比最強的格式)
+
+            const options = {
+
+                mimeType: ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+                    .find(type => typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(type)) || '',
+
+                audioBitsPerSecond: 64000, // 語音 64kbps 已足夠，節省空間
+
+                videoBitsPerSecond: selectedBitrate // 動態位元率控制
+
+            };
+
+
+
+            // 檢查瀏覽器是否支援 VP9，若不支援則降級回標準 webm
+
+            if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
+            if (!options.mimeType) delete options.mimeType;
+
+                options.mimeType = 'video/webm';
+
+            }
+
+
+
+            mediaRecorder = new MediaRecorder(stream, options);
+
+
+
+            mediaRecorder.ondataavailable = (e) => {
+
+                if (e.data.size > 0) recordedChunks.push(e.data);
+
+            };
+
+
+
+            mediaRecorder.onstop = () => {
+
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+
+                a.style.display = 'none';
+
+                a.href = url;
+
+                a.download = `Rec_${new Date().getTime()}.webm`;
+
+                document.body.appendChild(a);
+
+                a.click();
+
+                
+
+                setTimeout(() => {
+
+                    document.body.removeChild(a);
+
+                    window.URL.revokeObjectURL(url);
+
+                }, 100);
+
+
+
+                // 停止所有串流軌道
+
+                stream.getTracks().forEach(track => track.stop());
+                (stream._extra || []).forEach(x => x.getTracks ? x.getTracks().forEach(t => t.stop()) : x.close());
+
+                preview.srcObject = null;
+
+                updateUI(false);
+
+            };
+
+
+
+            if (document.getElementById('cdOn').checked) {
+                for (let n = 3; n > 0; n--) { statusText.innerText = '即將開始… ' + n; await new Promise(r => setTimeout(r, 1000)); }
+            }
+            if (stream.getVideoTracks()[0].readyState === 'ended') throw new Error('分享已結束');
+            mediaRecorder.start(1000);
+
+            updateUI(true);
+
+
+
+            // 監聽使用者點擊瀏覽器內建的「停止分享」按鈕
+
+            stream.getVideoTracks()[0].onended = () => {
+
+                if (mediaRecorder.state !== 'inactive') stopRecording();
+
+            };
+
+
+
+        } catch (err) {
+
+            console.error(err);
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            preview.srcObject = null;
+            updateUI(false);
+
+            if (err.name !== 'NotAllowedError') {
+
+                alert("啟動錄影失敗: " + err.message);
+
+            }
+
+        }
+
+    }
+
+
+
+    function stopRecording() {
+
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+
+            mediaRecorder.stop();
+
+        }
+
+    }
+
+
+
+    function updateUI(isRecording) {
+
+        if (isRecording) {
+
+            startBtn.disabled = true;
+
+            stopBtn.disabled = false;
+
+            statusText.innerText = "正在錄製..."; pauseBtn.disabled = false; pauseBtn.innerText = "暫停 (F3)"; startTimer();
+
+            statusContainer.classList.add('recording');
+
+        } else {
+
+            startBtn.disabled = false;
+
+            stopBtn.disabled = true; pauseBtn.disabled = true; clearInterval(tick);
+
+            statusText.innerText = "錄製結束並已儲存檔案";
+
+            statusContainer.classList.remove('recording');
+
+        }
+
+    }
+
+
+
+    startBtn.onclick = startRecording;
+    pauseBtn.onclick = togglePause;
+
+    stopBtn.onclick = stopRecording;
+
+
+
+    window.addEventListener('keydown', (e) => {
+
+        if (e.key === 'F3') { e.preventDefault(); togglePause(); }
+        if (e.key === 'F2') {
+
+            e.preventDefault();
+
+            toggleRecording();
+
+        }
+
+    });
+
+
+})();
+</script>
+
+
+
+
+            </body></html>

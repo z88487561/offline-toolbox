@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Code 產生器／掃描器</title>
+<script src="../lib/kjua.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;color:#1e293b;font-family:'Segoe UI','Microsoft JhengHei','PingFang TC',sans-serif;overflow:auto}
+.wrap{max-width:920px;margin:0 auto;padding:12px;display:grid;grid-template-columns:1fr 340px;gap:12px}
+@media(max-width:760px){.wrap{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px}
+h2,h3{margin:0 0 10px}h3{font-size:15px}
+.tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs button{padding:8px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font:600 14px inherit;font-family:inherit;cursor:pointer}
+.tabs button.on{background:#0d6efd;color:#fff;border-color:#0d6efd}
+label{display:block;font-size:13px;font-weight:600;color:#475569;margin:10px 0 4px}
+input[type=text],input[type=password],input[type=url],input[type=tel],input[type=email],textarea,select{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font:16px inherit;font-family:inherit;background:#fff}
+textarea{min-height:90px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btns button{padding:10px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font:600 14px inherit;font-family:inherit;cursor:pointer}
+.btns button.pri{background:#0d6efd;color:#fff;border-color:#0d6efd}
+.btns button:disabled{opacity:.4;cursor:not-allowed}
+#out{display:flex;align-items:center;justify-content:center;min-height:300px;background:repeating-conic-gradient(#f1f5f9 0 25%,#fff 0 50%) 0 0/16px 16px;border-radius:10px}
+#out img,#out canvas,#out svg{display:block;width:100%!important;max-width:512px;height:auto!important;aspect-ratio:1/1;image-rendering:pixelated}
+.hint{color:#64748b;font-size:12px;margin-top:6px}
+.hist{display:grid;gap:6px;max-height:180px;overflow:auto}
+.hist button{text-align:left;padding:8px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:8px;cursor:pointer;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+video{width:100%;border-radius:10px;background:#000;max-height:300px}
+#scanRes{word-break:break-all;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:10px;display:none}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <section class="card">
+  <h2>QR Code</h2>
+  <div class="tabs" id="tabs">
+   <button data-m="text" class="on">文字／網址</button><button data-m="wifi">WiFi</button><button data-m="vcard">名片</button><button data-m="scan">掃描</button>
+  </div>
+
+  <div id="p-text" class="pane">
+   <label for="txt">內容（支援中文、特殊符號）</label>
+   <textarea id="txt" placeholder="請輸入網址或文字…"></textarea>
+  </div>
+  <div id="p-wifi" class="pane hide">
+   <label>網路名稱 (SSID)</label><input type="text" id="w-ssid" autocomplete="off">
+   <div class="row"><div><label>密碼</label><input type="password" id="w-pass" autocomplete="off"></div>
+   <div><label>加密</label><select id="w-type"><option value="WPA">WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass">無密碼</option></select></div></div>
+   <label><input type="checkbox" id="w-hid"> 隱藏網路</label>
+  </div>
+  <div id="p-vcard" class="pane hide">
+   <div class="row"><div><label>姓名</label><input type="text" id="v-name"></div><div><label>公司</label><input type="text" id="v-org"></div></div>
+   <div class="row"><div><label>電話</label><input type="tel" id="v-tel"></div><div><label>Email</label><input type="email" id="v-mail"></div></div>
+   <label>網址</label><input type="url" id="v-url">
+  </div>
+
+  <div id="p-scan" class="pane hide">
+   <video id="cam" playsinline muted></video>
+   <div class="btns">
+    <button class="pri" id="camBtn">開啟相機掃描</button>
+    <button id="imgBtn">從圖片辨識</button>
+    <input type="file" id="imgIn" accept="image/*" class="hide">
+   </div>
+   <div id="scanRes"></div>
+   <div class="btns hide" id="scanAct"><button id="useScan">用此內容產生 QR</button><button id="copyScan">複製</button><button id="openScan">開啟連結</button></div>
+   <div class="hint" id="scanHint"></div>
+  </div>
+
+  <div id="opts">
+   <h3 style="margin-top:16px">外觀</h3>
+   <div class="row">
+    <div><label>尺寸</label><select id="size"><option>256</option><option selected>512</option><option>1024</option><option>2048</option></select></div>
+    <div><label>容錯率</label><select id="ec"><option value="L">L 7%</option><option value="M" selected>M 15%</option><option value="Q">Q 25%</option><option value="H">H 30%</option></select></div>
+    <div><label>前景色</label><input type="color" id="fg" value="#000000" style="width:100%;height:40px"></div>
+    <div><label>背景色</label><input type="color" id="bg" value="#ffffff" style="width:100%;height:40px"></div>
+   </div>
+   <label>圓角 <span id="rv">0</span>%</label><input type="range" id="round" min="0" max="100" value="0" style="width:100%">
+   <div class="hint">顏色對比不足或過多圓角可能降低掃描成功率。</div>
+  </div>
+ </section>
+
+ <aside class="card">
+  <h3>預覽</h3>
+  <div id="out"><span class="hint">輸入內容後自動產生</span></div>
+  <div class="btns">
+   <button class="pri" id="dlPng" disabled>PNG</button>
+   <button id="dlSvg" disabled>SVG</button>
+   <button id="copy" disabled>複製圖片</button>
+   <button id="share" disabled class="hide">分享</button>
+  </div>
+  <h3 style="margin-top:16px">最近產生 <button id="clr" style="float:right;font-size:12px;border:0;background:none;color:#64748b;cursor:pointer">清除</button></h3>
+  <div class="hist" id="hist"></div>
+ </aside>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let mode='text',timer,lastText='',stream=null,scanTimer=null;
+const esc=s=>s.replace(/([\\;,:"])/g,'\\$1');
+function payload(){
+  if(mode==='text')return $('txt').value.trim();
+  if(mode==='wifi'){const s=$('w-ssid').value;if(!s)return '';const t=$('w-type').value;
+    return `WIFI:T:${t};S:${esc(s)};${t==='nopass'?'':'P:'+esc($('w-pass').value)+';'}${$('w-hid').checked?'H:true;':''};`}
+  if(mode==='vcard'){const n=$('v-name').value.trim();if(!n&&!$('v-tel').value&&!$('v-mail').value)return '';
+    const l=['BEGIN:VCARD','VERSION:3.0','FN:'+n,'N:'+n+';;;;'];
+    if($('v-org').value)l.push('ORG:'+$('v-org').value);if($('v-tel').value)l.push('TEL:'+$('v-tel').value);
+    if($('v-mail').value)l.push('EMAIL:'+$('v-mail').value);if($('v-url').value)l.push('URL:'+$('v-url').value);
+    l.push('END:VCARD');return l.join('\n')}
+  return '';
+}
+function build(render){
+  return kjua({render,size:+$('size').value,text:lastText,fill:$('fg').value,back:$('bg').value,
+    ecLevel:$('ec').value,quiet:2,rounded:+$('round').value,mode:'plain',crisp:true});
+}
+function gen(){
+  clearTimeout(timer);timer=setTimeout(()=>{
+    const t=payload();lastText=t;const out=$('out');
+    ['dlPng','dlSvg','copy','share'].forEach(i=>$(i).disabled=!t);
+    if(!t){out.innerHTML='<span class="hint">輸入內容後自動產生</span>';return}
+    try{out.replaceChildren(build('canvas'));saveHist(t)}
+    catch(e){out.innerHTML='<span class="hint">內容過長，無法產生。請縮短或降低容錯率。</span>';['dlPng','dlSvg','copy','share'].forEach(i=>$(i).disabled=true)}
+  },250);
+}
+function saveName(ext){return 'qrcode-'+Date.now()+'.'+ext}
+function dl(href,name){const a=document.createElement('a');a.href=href;a.download=name;a.click()}
+$('dlPng').onclick=()=>dl(build('canvas').toDataURL('image/png'),saveName('png'));
+$('dlSvg').onclick=()=>{const svg=build('svg');const s=new XMLSerializer().serializeToString(svg);
+  const u=URL.createObjectURL(new Blob([s],{type:'image/svg+xml'}));dl(u,saveName('svg'));setTimeout(()=>URL.revokeObjectURL(u),2000)};
+const blobOf=()=>new Promise(r=>build('canvas').toBlob(r,'image/png'));
+$('copy').onclick=async()=>{try{await navigator.clipboard.write([new ClipboardItem({'image/png':blobOf()})]);flash($('copy'),'已複製 ✓')}catch(e){flash($('copy'),'無法複製')}};
+if(navigator.canShare){$('share').classList.remove('hide');
+  $('share').onclick=async()=>{const f=new File([await blobOf()],'qrcode.png',{type:'image/png'});if(navigator.canShare({files:[f]}))navigator.share({files:[f]}).catch(()=>{})}}
+function flash(b,t){const o=b.textContent;b.textContent=t;setTimeout(()=>b.textContent=o,1400)}
+
+/* 歷史 */
+const H='qr:hist';const getH=()=>{try{return JSON.parse(localStorage.getItem(H)||'[]')}catch(e){return[]}};
+function saveHist(t){let h=getH().filter(x=>x!==t);h.unshift(t);h=h.slice(0,10);try{localStorage.setItem(H,JSON.stringify(h))}catch(e){}renderHist()}
+function renderHist(){const box=$('hist');box.innerHTML='';getH().forEach(t=>{const b=document.createElement('button');b.textContent=t.replace(/\n/g,' ');b.title=t;
+  b.onclick=()=>{setMode('text');$('txt').value=t;gen()};box.appendChild(b)});
+  if(!box.children.length)box.innerHTML='<span class="hint">尚無紀錄（僅存於本機）</span>'}
+$('clr').onclick=()=>{try{localStorage.removeItem(H)}catch(e){}renderHist()};
+
+/* 模式切換 */
+function setMode(m){mode=m;document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.add('hide'));$('p-'+m).classList.remove('hide');
+  $('opts').classList.toggle('hide',m==='scan');if(m!=='scan'){stopCam();gen()}}
+$('tabs').onclick=e=>{if(e.target.dataset.m)setMode(e.target.dataset.m)};
+document.querySelectorAll('input,textarea,select').forEach(el=>{if(el.type!=='file')el.addEventListener('input',()=>{$('rv').textContent=$('round').value;gen()})});
+
+/* 掃描 */
+const hasBD='BarcodeDetector' in window;let det=hasBD?new BarcodeDetector({formats:['qr_code']}):null;
+$('scanHint').textContent=hasBD?'':'此瀏覽器不支援內建 QR 辨識（建議使用 Chrome／Edge／Android）。';
+function showScan(v){$('scanRes').style.display='block';$('scanRes').textContent=v;$('scanAct').classList.remove('hide');
+  $('openScan').classList.toggle('hide',!/^https?:\/\//i.test(v));window._scan=v}
+async function loop(){if(!stream)return;try{const r=await det.detect($('cam'));if(r.length){showScan(r[0].rawValue);stopCam();return}}catch(e){}scanTimer=setTimeout(loop,200)}
+function stopCam(){clearTimeout(scanTimer);if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('cam').srcObject=null;$('camBtn').textContent='開啟相機掃描'}
+$('camBtn').onclick=async()=>{
+  if(stream)return stopCam();if(!det)return alert('此瀏覽器不支援 QR 辨識');
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});$('cam').srcObject=stream;await $('cam').play();$('camBtn').textContent='停止';loop()}
+  catch(e){alert('無法開啟相機：'+e.message)}};
+$('imgBtn').onclick=()=>$('imgIn').click();
+$('imgIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;if(!det)return alert('此瀏覽器不支援 QR 辨識');
+  try{const bm=await createImageBitmap(f);const r=await det.detect(bm);r.length?showScan(r[0].rawValue):alert('找不到 QR Code')}catch(err){alert('辨識失敗')}e.target.value=''};
+$('useScan').onclick=()=>{setMode('text');$('txt').value=window._scan;gen()};
+$('copyScan').onclick=()=>navigator.clipboard.writeText(window._scan).then(()=>flash($('copyScan'),'已複製 ✓'));
+$('openScan').onclick=()=>window.open(window._scan,'_blank','noopener');
+renderHist();
+</script>
+</body>
+</html>
