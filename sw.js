@@ -1,5 +1,5 @@
 /* 全能工作站 Service Worker —— 預先快取全部檔案，完全離線可用 */
-const VERSION='19ff372fd4';
+const VERSION='0539597c48';
 const CACHE='ws-'+VERSION;
 const PRECACHE=["./", "README.md", "icons/apple-touch-icon.png", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "index.html", "lib/cropper.js", "lib/fabric.js", "lib/heic2any.js", "lib/jspdf.js", "lib/kjua.js", "lib/pako-inflate.js", "lib/pdf-lib.js", "lib/pdf.worker.js", "lib/pdfjs.js", "lib/sortable.js", "lib/utif.js", "manifest.webmanifest", "tools/compose.html", "tools/image.html", "tools/patch-compose.js", "tools/patch-image.js", "tools/patch-pdf.js", "tools/pdf.html", "tools/player.html", "tools/qr.html", "tools/record.html", "tools/viewer.html"];
 
